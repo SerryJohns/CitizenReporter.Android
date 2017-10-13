@@ -45,11 +45,8 @@
             android:name=".ui.splash.SplashActivity"
             android:screenOrientation="portrait"
             android:theme="@style/SplashTheme">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
 
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+
         </activity>
         <activity
             android:name=".ui.onboarding.OnboardingActivity"
@@ -94,10 +91,15 @@
             android:label="AssignmentDetail" />
         <activity
             android:name=".camera.CameraActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:configChanges="orientation|screenSize"
             android:label="@string/app_name"
-            android:screenOrientation="portrait"
-            android:theme="@style/FullscreenTheme"></activity>
+            android:theme="@style/FullscreenTheme">
+          <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+
+            <category android:name="android.intent.category.LAUNCHER" />
+          </intent-filter>
+        </activity>
         <activity
             android:name=".camera.ViewImageActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"

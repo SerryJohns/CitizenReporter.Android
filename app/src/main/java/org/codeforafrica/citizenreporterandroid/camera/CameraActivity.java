@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Rect;
@@ -50,6 +51,7 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.hardware.camera2.CameraDevice;
+import android.view.animation.RotateAnimation;
 import android.widget.Chronometer;
 import android.widget.ImageSwitcher;
 import android.widget.ImageView;
@@ -942,6 +944,26 @@ public class CameraActivity extends AppCompatActivity
 		if (mode != null) {
 			captureRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, awbAvailableModes.get(mode));
 		}
+	}
+
+	private void rotateIcons(float angle) {
+		float pivotX = swapCameraBtn.getPivotX();
+		float pivotY = swapCameraBtn.getPivotY();
+		RotateAnimation rotateAnimation = new RotateAnimation(0, angle, pivotX, pivotY);
+		rotateAnimation.setDuration(2000);
+		swapCameraBtn.setAnimation(rotateAnimation);
+		openGalleryBtn.setAnimation(rotateAnimation);
+	}
+
+	@Override public void onConfigurationChanged(Configuration newConfig) {
+		super.onConfigurationChanged(newConfig);
+		// Checks the orientation of the screen
+		if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+			Toast.makeText(this, "landscape", Toast.LENGTH_SHORT).show();
+		} else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT){
+			Toast.makeText(this, "portrait", Toast.LENGTH_SHORT).show();
+		}
+		rotateIcons(-90);
 	}
 
 	@Override

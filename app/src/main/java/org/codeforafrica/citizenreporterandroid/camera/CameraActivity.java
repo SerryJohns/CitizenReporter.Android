@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Rect;
@@ -83,7 +82,7 @@ import org.codeforafrica.citizenreporterandroid.GlideApp;
 import org.codeforafrica.citizenreporterandroid.R;
 
 public class CameraActivity extends AppCompatActivity
-		implements SceneSelectorAdapter.OnClickThumbListener {
+		implements SensorEventListener, SceneSelectorAdapter.OnClickThumbListener {
 	private static final String TAG = CameraActivity.class.getSimpleName();
 	private static final int REQUEST_CAMERA_PERMISSION = 1;
 	private static final int REQUEST_STORAGE_PERMISSION = 2;
@@ -181,14 +180,13 @@ public class CameraActivity extends AppCompatActivity
 	private static String signatureScene;
 
 	private SensorManager mSensorManager;
-	private float[] gravityReading; // Gravitation rotational data
-	private float[] magneticReading; // Magnetic rotation data
-	private float[] accelerometerReading = new float[3];
-	private float[] magnetometerReading = new float[3];
-	private float[] values = new float[3];
+	private final float[] accelerometerReading = new float[3];
+	private final float[] magnetometerReading = new float[3];
+	private final float[] mRotationMatrix = new float[9];
+	private final float[] mOrientationAngles = new float[3];
 	private float azimuth;
-	private float pitch;
-	private float roll;
+	private double currentAzimuth = 0;
+	private float currentAngle = 0;
 
 	@BindView(R.id.scene_recylcer_view) RecyclerView sceneRecyclerView;
 	@BindView(R.id.tv_camera) TextureView textureView;
@@ -775,7 +773,7 @@ public class CameraActivity extends AppCompatActivity
 		super.onPause();
 		closeCamera();
 		stopBackgroundThread();
-		mSensorManager.unregisterListener(sensorEventListener);
+		mSensorManager.unregisterListener(this);
 	}
 
 	private void setUpMediaRecorder() throws IOException {
@@ -961,13 +959,14 @@ public class CameraActivity extends AppCompatActivity
 		}
 	}
 
-	private void rotateIcons(float angle) {
+	private void rotateIcons(float fromAngle, float toAngle) {
 		float pivotX = swapCameraBtn.getPivotX();
 		float pivotY = swapCameraBtn.getPivotY();
-		RotateAnimation rotateAnimation = new RotateAnimation(0, angle, pivotX, pivotY);
+		RotateAnimation rotateAnimation = new RotateAnimation(fromAngle, toAngle, pivotX, pivotY);
 		rotateAnimation.setDuration(2000);
 		swapCameraBtn.setAnimation(rotateAnimation);
 		openGalleryBtn.setAnimation(rotateAnimation);
+		Toast.makeText(getApplicationContext(), "Rotating: " + toAngle, Toast.LENGTH_SHORT).show();
 	}
 
 	@Override
@@ -1461,45 +1460,17 @@ public class CameraActivity extends AppCompatActivity
 			textureView.setSurfaceTextureListener(surfaceTextureListener);
 		}
 
-		mSensorManager.registerListener(sensorEventListener,
-				mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
-				SensorManager.SENSOR_DELAY_NORMAL);
-		mSensorManager.registerListener(sensorEventListener,
+		mSensorManager.registerListener(this,
 				mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD),
+				SensorManager.SENSOR_DELAY_NORMAL);
+		mSensorManager.registerListener(this,
+				mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
 				SensorManager.SENSOR_DELAY_NORMAL);
 	}
 
-	private SensorEventListener sensorEventListener = new SensorEventListener() {
-		@Override public void onSensorChanged(SensorEvent event) {
-			switch(event.sensor.getType()) {
-				case Sensor.TYPE_MAGNETIC_FIELD:
-					magnetometerReading = event.values.clone();
-					break;
-				case Sensor.TYPE_ACCELEROMETER:
-					accelerometerReading = event.values.clone();
-					break;
-			}
-
-			if (magnetometerReading != null && accelerometerReading != null) {
-				gravityReading = new float[9];
-				magneticReading = new float[9];
-				SensorManager.getRotationMatrix(gravityReading, magneticReading,
-						accelerometerReading, magnetometerReading);
-				float[] outGravity = new float[9];
-				SensorManager.remapCoordinateSystem(gravityReading, SensorManager.AXIS_X, SensorManager.AXIS_Z, outGravity);
-				SensorManager.getOrientation(outGravity, values);
-				azimuth = values[0] * 57.2957795f;
-				pitch = values[1] * 57.2957795f;
-				roll = values[2] * 57.2957795f;
-				accelerometerReading = null;
-				magnetometerReading = null;
-			}
-		}
-
-		@Override public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-		}
-	};
+	//private SensorEventListener sensorEventListener = new SensorEventListener() {
+	//
+	//};
 
 	public void swipeScenes(Integer nextScene, Integer prevScene) {
 		final int UN_SELECTED = R.drawable.ic_circular;
@@ -1745,6 +1716,48 @@ public class CameraActivity extends AppCompatActivity
 			manualFocusEngaged = true;
 			return true;
 		}
+	}
+
+	@Override public void onSensorChanged(SensorEvent event) {
+		switch(event.sensor.getType()) {
+			case Sensor.TYPE_MAGNETIC_FIELD:
+				System.arraycopy(event.values, 0, magnetometerReading,
+						0, magnetometerReading.length);
+				break;
+			case Sensor.TYPE_ACCELEROMETER:
+				System.arraycopy(event.values, 0, accelerometerReading,
+						0, accelerometerReading.length);
+				break;
+		}
+
+		mSensorManager.getRotationMatrix(mRotationMatrix, null,
+				accelerometerReading, magnetometerReading);
+		mSensorManager.getOrientation(mRotationMatrix, mOrientationAngles);
+		azimuth = accelerometerReading[0];
+		checkIconRotation(azimuth);
+	}
+
+	@Override public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+	}
+
+	private void checkIconRotation(float azimuthValue) {
+		double accValue = Math.ceil(azimuthValue);
+	 float rotation = 0;
+
+	 if (accValue >= 5) { // rotate anti-clockwise
+	 	rotation = 90;
+	 } else if (accValue >= -7 && accValue < 5) { // keep at zero
+	 	rotation = 0;
+	 } else if (accValue < -7 ) { // rotate clock-wise
+	 	rotation = -90;
+	 }
+
+	 if (currentAzimuth == accValue) return;
+	 currentAzimuth = accValue;
+	 if (currentAngle == rotation) return;
+	 currentAngle = rotation;
+	 rotateIcons(currentAngle, rotation);
 	}
 
 	public boolean checkWhiteBalanceStatus(String mode) {

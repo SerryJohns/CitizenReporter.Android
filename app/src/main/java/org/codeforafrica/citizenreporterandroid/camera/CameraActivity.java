@@ -1471,7 +1471,29 @@ public class CameraActivity extends AppCompatActivity
 
 	private SensorEventListener sensorEventListener = new SensorEventListener() {
 		@Override public void onSensorChanged(SensorEvent event) {
+			switch(event.sensor.getType()) {
+				case Sensor.TYPE_MAGNETIC_FIELD:
+					magnetometerReading = event.values.clone();
+					break;
+				case Sensor.TYPE_ACCELEROMETER:
+					accelerometerReading = event.values.clone();
+					break;
+			}
 
+			if (magnetometerReading != null && accelerometerReading != null) {
+				gravityReading = new float[9];
+				magneticReading = new float[9];
+				SensorManager.getRotationMatrix(gravityReading, magneticReading,
+						accelerometerReading, magnetometerReading);
+				float[] outGravity = new float[9];
+				SensorManager.remapCoordinateSystem(gravityReading, SensorManager.AXIS_X, SensorManager.AXIS_Z, outGravity);
+				SensorManager.getOrientation(outGravity, values);
+				azimuth = values[0] * 57.2957795f;
+				pitch = values[1] * 57.2957795f;
+				roll = values[2] * 57.2957795f;
+				accelerometerReading = null;
+				magnetometerReading = null;
+			}
 		}
 
 		@Override public void onAccuracyChanged(Sensor sensor, int accuracy) {

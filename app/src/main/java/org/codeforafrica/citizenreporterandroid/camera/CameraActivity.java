@@ -13,6 +13,10 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -175,6 +179,16 @@ public class CameraActivity extends AppCompatActivity
 	private static String interactionScene;
 	private static String environmentScene;
 	private static String signatureScene;
+
+	private SensorManager mSensorManager;
+	private float[] gravityReading; // Gravitation rotational data
+	private float[] magneticReading; // Magnetic rotation data
+	private float[] accelerometerReading = new float[3];
+	private float[] magnetometerReading = new float[3];
+	private float[] values = new float[3];
+	private float azimuth;
+	private float pitch;
+	private float roll;
 
 	@BindView(R.id.scene_recylcer_view) RecyclerView sceneRecyclerView;
 	@BindView(R.id.tv_camera) TextureView textureView;
@@ -758,9 +772,10 @@ public class CameraActivity extends AppCompatActivity
 	}
 
 	@Override protected void onPause() {
+		super.onPause();
 		closeCamera();
 		stopBackgroundThread();
-		super.onPause();
+		mSensorManager.unregisterListener(sensorEventListener);
 	}
 
 	private void setUpMediaRecorder() throws IOException {
@@ -955,17 +970,6 @@ public class CameraActivity extends AppCompatActivity
 		openGalleryBtn.setAnimation(rotateAnimation);
 	}
 
-	@Override public void onConfigurationChanged(Configuration newConfig) {
-		super.onConfigurationChanged(newConfig);
-		// Checks the orientation of the screen
-		if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-			Toast.makeText(this, "landscape", Toast.LENGTH_SHORT).show();
-		} else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT){
-			Toast.makeText(this, "portrait", Toast.LENGTH_SHORT).show();
-		}
-		rotateIcons(-90);
-	}
-
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -974,6 +978,8 @@ public class CameraActivity extends AppCompatActivity
 
 		gestureObject = new GestureDetectorCompat(this, new LearnGesture());
 		scaleGestureDetector = new ScaleGestureDetector(this, new ScaleListener());
+		mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+
 		initializeObjects();
 		initializeScenes();
 		initializeCameraInterface(); // Creates the swipe buttons
@@ -1447,7 +1453,6 @@ public class CameraActivity extends AppCompatActivity
 	@Override protected void onResume() {
 		super.onResume();
 		startBackgroundThread();
-
 		if (textureView.isAvailable()) {
 			setUpCamera(textureView.getWidth(), textureView.getHeight());
 			transformImage(textureView.getWidth(), textureView.getHeight());
@@ -1455,7 +1460,24 @@ public class CameraActivity extends AppCompatActivity
 		} else {
 			textureView.setSurfaceTextureListener(surfaceTextureListener);
 		}
+
+		mSensorManager.registerListener(sensorEventListener,
+				mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+				SensorManager.SENSOR_DELAY_NORMAL);
+		mSensorManager.registerListener(sensorEventListener,
+				mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD),
+				SensorManager.SENSOR_DELAY_NORMAL);
 	}
+
+	private SensorEventListener sensorEventListener = new SensorEventListener() {
+		@Override public void onSensorChanged(SensorEvent event) {
+
+		}
+
+		@Override public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+		}
+	};
 
 	public void swipeScenes(Integer nextScene, Integer prevScene) {
 		final int UN_SELECTED = R.drawable.ic_circular;
